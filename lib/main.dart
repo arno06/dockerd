@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:window_size/window_size.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 
-const DOCKER_COMMAND = 'docker-digit.sh';
+String DOCKER_COMMAND = 'docker';
+List<String> DEFAULT_DOCKER_PARAMETERS = ['--tlsverify', '-H=docker-digital.vidal.net:2376'];
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,13 +70,27 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
 
   bool _containerLoaded = false;
   bool _imageLoaded = false;
+  bool _recycling = false;
+
+  String? lastRecycle;
 
   String _logData = "";
+
+  String? _selectedFolderProject;
+
+  late TextEditingController _repositoryTEC;
+  late TextEditingController _tagTEC;
+  late TextEditingController _nameTEC;
+  late TextEditingController _domainTEC;
 
   @override
   void initState() {
     super.initState();
     _textEditingController = TextEditingController();
+    _repositoryTEC = TextEditingController();
+    _tagTEC = TextEditingController();
+    _nameTEC = TextEditingController();
+    _domainTEC = TextEditingController();
     refreshContainer();
     refreshImages();
   }
@@ -82,12 +98,21 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
   @override
   void dispose() {
     _textEditingController.dispose();
+    _repositoryTEC.dispose();
+    _tagTEC.dispose();
+    _nameTEC.dispose();
+    _domainTEC.dispose();
     super.dispose();
   }
 
-  void _log(List<String> parameters){
+  void _log(List<String> parameters, {String? command}){
+    if(command == null){
+      command = DOCKER_COMMAND;
+    }
     setState(() {
-      _logData += DateTime.now().toString()+"\t"+DOCKER_COMMAND+" "+parameters.join(" ")+"\n";
+      var log = DateTime.now().toString()+"\t"+(command!)+" "+parameters.join(" ");
+      print(log);
+      _logData += log+"\n";
     });
   }
 
@@ -96,13 +121,12 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
       _imageLoaded = false;
     });
     var cols = ['REPOSITORY', 'TAG', 'IMAGE ID', 'CREATED', 'SIZE'];
-    _log(['images']);
-    Process.run(DOCKER_COMMAND, ['images']).then((ProcessResult results){
+    runDockerCommand(['images']).then((ProcessResult results){
       images.clear();
       String result = results.stdout;
       List<String> lines = result.split(RegExp('\n'));
-      var lengths = getCommandLineHeadLengths(lines[1], cols);
-      for(var i = 2, max = lines.length-1; i<max; i++){
+      var lengths = getCommandLineHeadLengths(lines[0], cols);
+      for(var i = 1, max = lines.length-1; i<max; i++){
         var line = lines[i];
         var props = parseLine(line, lengths);
         images.add(ImageContainer(
@@ -146,13 +170,18 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
       _containerLoaded = false;
     });
     var cols = ['CONTAINER ID', 'IMAGE', 'COMMAND', 'CREATED', 'STATUS', 'PORTS', 'NAMES'];
-    _log(['ps', '-a']);
-    Process.run(DOCKER_COMMAND, ['ps','-a']).then((ProcessResult results){
+    runDockerCommand(['ps', '-a']).then((ProcessResult results){
       containers.clear();
       String result = results.stdout;
       List<String> lines = result.split(RegExp('\n'));
-      var lengths = getCommandLineHeadLengths(lines[1], cols);
-      for(var i = 2, max = lines.length-1; i<max; i++){
+      if(lines.length==1 || (lines.length==2 && lines.elementAt(1) == "")){
+        setState((){
+          _containerLoaded = true;
+        });
+        return;
+      }
+      var lengths = getCommandLineHeadLengths(lines[0], cols);
+      for(var i = 1, max = lines.length-1; i<max; i++){
         var line = lines[i];
         var props = parseLine(line, lengths);
         containers.add(DockerContainer(
@@ -171,13 +200,14 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
 
   @override
   Widget build(BuildContext context) {
+    var tabs = [containerView(),imageView(),projectView(context),configurationView()];
     return Scaffold(
       body: Container(
           decoration:BoxDecoration(color:Colors.black12),
           child:Stack(
             children:[
               Center(
-                  child: _selectedIndex==0?containerView():imageView()
+                  child: tabs[_selectedIndex]
               ),
               AnimatedPositioned(
                 duration:Duration(milliseconds: 350),
@@ -251,6 +281,10 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
             icon: Icon(Icons.storage),
             label: 'Images',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.folder),
+            label: 'Projet en cours',
+          ),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.blueAccent,
@@ -262,6 +296,169 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
       ),
     );
 
+  }
+
+  Widget configurationView(){
+    return Center(
+      child: Text("Configuration"),
+    );
+  }
+
+  void _getDirectoryPath(BuildContext context) async {
+    const confirmButtonText = 'Sélectionner';
+    final directoryPath = await FileSelectorPlatform.instance.getDirectoryPath(
+      confirmButtonText: confirmButtonText,
+    );
+
+    var hasGit = await Directory((directoryPath??'')+'/.git/').existsSync();
+    if(hasGit){
+      var command = 'git';
+      var params = ['-C', directoryPath??'', 'branch', '--show-current'];
+
+      Process.run(command, params).then((ProcessResult results){
+        var project = directoryPath!.split('/').last;
+        var branch = results.stdout.replaceAll('\n', '').replaceAll('dev/', '').replaceAll('fix/', '');
+        _repositoryTEC.text = project;
+        _tagTEC.text = branch;
+        _nameTEC.text = project+'_'+branch;
+        _domainTEC.text = branch+'.'+project;
+
+        setState(() {
+          _selectedFolderProject = directoryPath;
+        });
+      });
+    }else{
+      setState(() {
+        _selectedFolderProject = directoryPath;
+      });
+    }
+  }
+
+  Widget projectView(BuildContext context){
+
+    return Container(
+      decoration:BoxDecoration(color:Colors.white10),
+      width: double.infinity,
+      padding:EdgeInsets.all(10.0),
+      child: Column(
+        children: [
+          Opacity(
+              opacity: _recycling?1:0,
+              child:LinearProgressIndicator()
+          ),
+          projectTitle('Dossier de travail'),
+          Container(
+            width: double.infinity,
+            decoration:BoxDecoration(color:Colors.white),
+            padding: EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding:EdgeInsets.all(5.0),
+                    decoration:BoxDecoration(
+                      color:Colors.white,
+                      border: Border(
+                        bottom:BorderSide()
+                      )
+                    ),
+                    width: double.infinity,
+                    child: Text(_selectedFolderProject??'Choisir un dossier'),
+                  )
+                ),
+                IconButton(onPressed: ()=>_getDirectoryPath(context), icon: Icon(Icons.folder_open, color:Colors.amber)),
+              ],
+            ),
+          ),
+          Container(height: 10.0,),
+          projectTitle('Image'),
+          projectInput('Repository', _repositoryTEC),
+          projectInput('Tag', _tagTEC),
+          Container(height: 10.0,),
+          projectTitle('Conteneur'),
+          projectInput('Nom', _nameTEC),
+          projectInput('Sous-domaine', _domainTEC),
+          Container(height: 10.0,),
+          ElevatedButton(
+            onPressed: _recycling?null:(){
+              recyclingHandler();
+            },
+            child: Container(
+              width:150,
+              padding:EdgeInsets.all(10.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.autorenew),
+                  Text('Recycler')
+                ],
+              ),
+            )
+          )
+        ],
+      ),
+    );
+  }
+
+  void recyclingHandler(){
+    var image = _repositoryTEC.text+':'+_tagTEC.text;
+    var container = _nameTEC.text;
+    var domain = _domainTEC.text;
+    setState(() {
+      _recycling = true;
+    });
+    runDockerCommand(['kill', container]).then((value){
+      runDockerCommand(['rm', container, '--force']).then((value){
+        runDockerCommand(['rmi', image, '--force']).then((value){
+          runDockerCommand(['build', '-t', image, _selectedFolderProject??'']).then((value){
+            runDockerCommand(['run', '-d', '--name', container, '-e', 'VIRTUAL_HOST='+domain+'.ama-doc.vidal.fr', image]).then((value){
+              setState(() {
+                _recycling = false;
+                lastRecycle = DateTime.now().toString();
+              });
+            });
+          });
+        });
+      });
+    });
+  }
+
+  Widget projectInput(pLabel, pController){
+    return Container(
+      width: double.infinity,
+      decoration:BoxDecoration(color:Colors.white),
+      padding: EdgeInsets.only(left:20.0, right:20.0, top:5.0, bottom:5.0),
+      child: Row(
+        children: [
+          Container(
+            width:110,
+            child:
+            Text(
+                pLabel,
+              style: TextStyle(color:Colors.grey, fontSize: 12.0),
+            ),
+          ),
+          Expanded(
+              child: TextField(
+                  controller: pController
+              ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget projectTitle(pLabel){
+    return Container(
+      width: double.infinity,
+      decoration:BoxDecoration(color:Colors.lightBlue),
+      padding: EdgeInsets.all(10.0),
+      child: Text(pLabel,
+        style: TextStyle(
+            color: Colors.white
+        ),
+      ),
+    );
   }
 
   Widget imageView(){
@@ -501,15 +698,20 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
     );
   }
 
+  Future<ProcessResult> runDockerCommand(List<String> parameters){
+    List<String> params = new List<String>.from(DEFAULT_DOCKER_PARAMETERS);
+    params.addAll(parameters);
+    _log(params);
+    return Process.run(DOCKER_COMMAND, params);
+  }
+
   void inspectSelectedContainer(){
     if(_selectedContainer!.inspection != null){
       return;
     }
     List<String> params = ["inspect", _selectedContainer!.id];
-    _log(params);
-    Process.run(DOCKER_COMMAND, params).then((ProcessResult results){
+    runDockerCommand(params).then((ProcessResult results){
       List<String> lines = results.stdout.split('\n');
-      lines.removeAt(0);
       List<dynamic> inspections = jsonDecode(lines.join('\n'));
       _selectedContainer?.inspection = inspections.elementAt(0);
       List<dynamic> envs = _selectedContainer?.inspection?['Config']?['Env'];
@@ -532,8 +734,7 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
         params.add(element.id);
       }
     });
-    _log(params);
-    Process.run(DOCKER_COMMAND, params).then((ProcessResult results){
+    runDockerCommand(params).then((ProcessResult results){
       refreshImages();
     });
   }
@@ -545,8 +746,7 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
         params.add(element.id);
       }
     });
-    _log(params);
-    Process.run(DOCKER_COMMAND, params).then((ProcessResult results){
+    runDockerCommand(params).then((ProcessResult results){
       refreshContainer();
     });
   }
