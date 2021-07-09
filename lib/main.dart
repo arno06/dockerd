@@ -7,7 +7,7 @@ import 'package:window_size/window_size.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 
-String DOCKER_COMMAND = 'docker';
+String DOCKER_COMMAND = '/usr/local/bin/docker';
 List<String> DEFAULT_DOCKER_PARAMETERS = ['--tlsverify', '-H=docker-digital.vidal.net:2376'];
 
 void main() {
@@ -111,7 +111,6 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
     }
     setState(() {
       var log = DateTime.now().toString()+"\t"+(command!)+" "+parameters.join(" ");
-      print(log);
       _logData += log+"\n";
     });
   }
@@ -301,6 +300,58 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
   Widget configurationView(){
     return Center(
       child: Text("Configuration"),
+    );
+  }
+
+  Widget cliWidget(){
+    return Positioned(
+        bottom: 0,
+        left:0,
+        child: Container(
+          height:240,
+          child: Column(
+            children: [
+              Container(
+                  padding:EdgeInsets.all(10.0),
+                  decoration:BoxDecoration(
+                      color: Colors.black87
+                  ),
+                  height:200,
+                  width:900,
+                  child: SingleChildScrollView(
+                      child: Text(
+                        _logData,
+                        style: TextStyle(color: Colors.white),
+                      )
+                  )
+              ),
+              Container(
+                width:900,
+                height:40,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _textEditingController,
+                      ),
+                    ),
+                    TextButton(onPressed: (){
+
+                      Process.run('bash', ['-c', _textEditingController.text], runInShell: true).then((ProcessResult results){
+                        if(results.exitCode != 0){
+                          _log([], command:'Error : '+results.stderr);
+                        }else{
+                          _log([], command:' '+results.stdout);
+                        }
+                        return results;
+                      });
+                    }, child: Text("run")),
+                  ],
+                ),
+              )
+            ],
+          ),
+        )
     );
   }
 
@@ -702,7 +753,12 @@ class _DockerDigitHomeState extends State<DockerDigitHome> {
     List<String> params = new List<String>.from(DEFAULT_DOCKER_PARAMETERS);
     params.addAll(parameters);
     _log(params);
-    return Process.run(DOCKER_COMMAND, params);
+    return Process.run(DOCKER_COMMAND, params, runInShell: true).then((ProcessResult results){
+      if(results.exitCode != 0){
+        _log([], command:'Error : '+results.stderr);
+      }
+      return results;
+    });
   }
 
   void inspectSelectedContainer(){
