@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dockerd/dockerd/utils/CommandHelper.dart';
 import 'package:dockerd/dockerd/utils/ConfigStorage.dart';
+import 'package:dockerd/dockerd/widgets/Console.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ContainersList extends StatefulWidget {
   const ContainersList({Key? key}) : super(key: key);
@@ -80,12 +83,9 @@ class _ContainersListState extends State<ContainersList> {
                   children: [
                     TextButton(onPressed: (){
                       setState(() {
-                        /*_selectedContainer = ctn;
-                        inspectSelectedContainer();
-                        _opened = true;*/
+                        inspectContainer(ctn);
                       });
                     }, child: Icon(Icons.preview, size:16.0, color:Colors.black87)),
-                    TextButton(onPressed: (){}, child: Icon(Icons.archive, size:16.0, color:Colors.black87)),
                   ],
                 )),
               ]
@@ -163,8 +163,81 @@ class _ContainersListState extends State<ContainersList> {
                 ),
             ),
         ),
+        Console()
       ],
     );
+  }
+
+  void inspectContainer(DockerContainer container){
+    List<String> params = ["inspect", container.id];
+    runDockerCommand(params).then((ProcessResult results){
+      List<String> lines = results.stdout.split('\n');
+      List<dynamic> inspections = jsonDecode(lines.join('\n'));
+      container.inspection = inspections.elementAt(0);
+      List<dynamic> envs = container.inspection?['Config']?['Env'];
+      envs.insert(0, 'ID='+container.id);
+      List<Widget> envsVals = [];
+      envs.forEach((element) {
+        List<String> parts = element.split('=');
+        if(parts[0].indexOf('VIRTUAL_HOST') > -1){
+          parts[1] = 'http://'+parts[1];
+        }
+        if(parts[0].indexOf('LETSENCRYPT_HOST') > -1){
+          parts[1] = 'https://'+parts[1];
+        }
+        Widget value = parts[1].indexOf('http')>-1?MaterialButton(onPressed: (){
+          launch(parts[1]);
+        }, child: Align(alignment:Alignment.centerLeft, child: Text(parts[1], overflow: TextOverflow.ellipsis,textAlign: TextAlign.start,),),)
+            :Text(parts[1], overflow: TextOverflow.ellipsis,);
+        envsVals.add(
+          Container(
+            height:30,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Text(parts[0], style:TextStyle(fontSize: 12.0, color: Colors.black38)),
+                Container(
+                  padding:EdgeInsets.only(left:3.0, right:3.0),
+                  child: Text('=', style:TextStyle(fontSize: 11.0, color: Colors.black26)),
+                ),
+                Expanded(child: value),
+              ],
+            ),
+          ),
+        );
+      });
+      showDialog(context: context, builder: (BuildContext context){
+        return SimpleDialog(
+          title:Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(container.name, style: TextStyle(fontSize: 14.0),),
+                  Text(container.image, style: TextStyle(fontSize: 12.0, color: Colors.black54))
+                ],
+              ),
+              Spacer(),
+              IconButton(icon: Icon(Icons.close), onPressed: (){
+                Navigator.pop(context);
+              },)
+            ],
+          ),
+          children: [
+            Container(
+              padding:EdgeInsets.all(10.0),
+              width:600,
+              height:300,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: envsVals,
+                ),
+              )
+            ),
+          ],
+        );
+      });
+    });
   }
 
   void runCommandContainer(String command){

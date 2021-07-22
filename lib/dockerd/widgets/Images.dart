@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dockerd/dockerd/utils/CommandHelper.dart';
 import 'package:dockerd/dockerd/utils/ConfigStorage.dart';
+import 'package:dockerd/dockerd/widgets/Console.dart';
 import 'package:flutter/material.dart';
 
 class ImagesList extends StatefulWidget {
@@ -132,6 +133,7 @@ class _ImagesListState extends State<ImagesList> {
                 )
             )
         ),
+        Console()
       ],
     );
   }
@@ -143,10 +145,7 @@ class _ImagesListState extends State<ImagesList> {
         params.add(element.id);
       }
     });
-    print(params);
     runDockerCommand(params).then((ProcessResult results){
-      print(results.stdout);
-      print(results.stderr);
       refreshImages();
     });
   }

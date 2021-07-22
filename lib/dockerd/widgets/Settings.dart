@@ -13,14 +13,17 @@ class _SettingsState extends State<Settings> {
 
   late TextEditingController _dockerCommandTEC;
   late List<String> _parameters;
+  late Map<String, String> _environmentsVars;
   late List<TextEditingController> _tec = [];
+  late List<List<TextEditingController>> _envTec = [];
+  ConfigStorage config = ConfigStorage();
 
   @override
   void initState() {
     super.initState();
-    var config = ConfigStorage();
     _dockerCommandTEC = TextEditingController(text: config.dockerCommand);
     _parameters = config.dockerDefaultParameters;
+    _environmentsVars = config.dockerEnvironmentsVars;
   }
 
   @override
@@ -29,6 +32,11 @@ class _SettingsState extends State<Settings> {
     _tec.forEach((element) {
       element.dispose();
     });
+    for (var value in _envTec) {
+      value.forEach((element) {
+        element.dispose();
+      });
+    }
     super.dispose();
   }
 
@@ -57,11 +65,72 @@ class _SettingsState extends State<Settings> {
         )
       );
     }
+
+    _envTec.clear();
+    List<Widget> envVars = [];
+    _environmentsVars.forEach((key, value) {
+      List<TextEditingController> tcs = [];
+      var ntec = TextEditingController(text: key);
+      tcs.add(ntec);
+      var vtec = TextEditingController(text: value);
+      tcs.add(vtec);
+      _envTec.add(tcs);
+      envVars.add(
+          Container(
+            padding:EdgeInsets.only(bottom:5.0),
+            child: Row(
+              children: [
+                input(ntec),
+                Container(width:5),
+                Text('='),
+                Container(width:5),
+                input(vtec),
+                TextButton(onPressed: (){
+                  setState(() {
+                    _environmentsVars.remove(key);
+                  });
+                }, child: Icon(Icons.delete, size:11.0, color: Colors.black87)),
+              ],
+            ),
+          )
+      );
+    });
+
     return Container(
       decoration:BoxDecoration(color: Color(0xFFeaeaea)),
       padding:EdgeInsets.all(10.0),
       child: Column(
         children: [
+          Row(
+            children: [
+              Text("Général", style:TextStyle(fontSize:12.0)),
+              Container(width:10),
+              Expanded(child: Container(
+                height:0,
+                decoration: BoxDecoration(border: Border(top:BorderSide(color:Color(0xffaaaaaa)))),
+              ))
+            ],
+          ),
+          Container(
+              padding:EdgeInsets.all(10.0),
+              child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: config.consoleDisplayed,
+                          onChanged: (bool? val){
+                            setState(() {
+                              config.consoleDisplayed = val??false;
+                            });
+                        }),
+                        label('Afficher la console', 200, precedeInput: false),
+                      ],
+                    ),
+                  ]
+              )
+          ),
+          Container(height:20),
           Row(
             children: [
               Text("Docker", style:TextStyle(fontSize:12.0)),
@@ -116,7 +185,43 @@ class _SettingsState extends State<Settings> {
                       )
                     )
                   ],
-                )
+                ),
+
+                Container(height:10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    label('Variables d\'environnements', 200),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(5.0),
+                            height:140,
+                            decoration: BoxDecoration(
+                                border: Border.all(color:Color(0xffaaaaaa))
+                            ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: envVars,
+                              ),
+                            ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(onPressed: (){
+                                setState(() {
+                                  _environmentsVars[''] = '';
+                                });
+                              }, child: Icon(Icons.add, size:11.0, color: Colors.black87,)),
+                            ],
+                          )
+                        ],
+                      )
+                    )
+                  ],
+                ),
               ],
             ),
           ),
@@ -134,6 +239,12 @@ class _SettingsState extends State<Settings> {
                     p.add(element.text);
                   });
                   config.dockerDefaultParameters = p;
+
+                  Map<String, String> e = {};
+                  _envTec.forEach((element) {
+                    e[element[0].text] = element[1].text;
+                  });
+                  config.dockerEnvironmentsVars = e;
                 },
                 child: Container(
                   padding:EdgeInsets.all(10.0),
@@ -163,10 +274,10 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  Widget label(String label, int width){
+  Widget label(String label, int width, {bool precedeInput = true}){
     return Container(
       width:width.toDouble(),
-      child: Text(label+' :', style:TextStyle(fontSize:13.0)),
+      child: Text(label+(precedeInput?' :':''), style:TextStyle(fontSize:13.0)),
     );
   }
 }

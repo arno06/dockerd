@@ -21,7 +21,7 @@ class ConfigStorage
 
   String containersFilter = "";
   String imagesFilter = "";
-
+  String logData = "";
 
   late Map<String, dynamic> session;
 
@@ -30,6 +30,22 @@ class ConfigStorage
     if(session['dockerDefaultParameters']!=null){
       session['dockerDefaultParameters'] = (session['dockerDefaultParameters'] as List).cast<String>().toList();
     }
+    if(session['dockerEnvironmentsVars']!= null){
+      session['dockerEnvironmentsVars'] = (session['dockerEnvironmentsVars'] as Map).cast<String, String>();
+    }
+    if(session['containerEnvs']!= null){
+      session['containerEnvs'] = (session['containerEnvs'] as Map).cast<String, String>();
+    }
+  }
+
+  void log({String? data, String? cmd, List<String>? parameters}){
+    String log = DateTime.now().toString()+"\t";
+    if(data != null){
+      log += data;
+    }else{
+      log += (cmd??'')+' '+(parameters!.join(' '));
+    }
+    logData += log+'\n';
   }
 
   String get workingDirectory => session['workingDirectory']??'';
@@ -52,9 +68,9 @@ class ConfigStorage
     storeVal('containerName', val);
   }
 
-  String get containerSubdomain => session['containerSubdomain']??'';
-  set containerSubdomain(String val){
-    storeVal('containerSubdomain', val);
+  Map<String, String> get containerEnvs => session['containerEnvs']??{};
+  set containerEnvs(Map<String, String> val){
+    storeVal('containerEnvs', val);
   }
 
   bool get sideBarOpened => session['sideBarOpened']??false;
@@ -70,6 +86,16 @@ class ConfigStorage
   List<String> get dockerDefaultParameters => session['dockerDefaultParameters']??['--tlsverify', '-H=docker-digital.vidal.net:2376'];
   set dockerDefaultParameters(List<String> val){
     storeVal('dockerDefaultParameters', val);
+  }
+
+  Map<String, String> get dockerEnvironmentsVars => session['dockerEnvironmentsVars']??{'VIRTUAL_HOST':'{value}.ama-doc.vidal.fr'};
+  set dockerEnvironmentsVars(Map<String, String> val){
+    storeVal('dockerEnvironmentsVars', val);
+  }
+
+  bool get consoleDisplayed => session['consoleDisplayed']??false;
+  set consoleDisplayed(bool val){
+    storeVal('consoleDisplayed', val);
   }
 
   void storeVal(key, val) async{
