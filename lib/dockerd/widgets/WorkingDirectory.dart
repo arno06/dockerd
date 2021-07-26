@@ -43,7 +43,7 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
         _extractInfoFromGit(session.workingDirectory);
       }
     }
-    var envs = session.dockerEnvironmentsVars;
+    var envs = {...session.dockerEnvironmentsVars};
     session.containerEnvs.forEach((key, value) {
       envs[key] = value;
     });

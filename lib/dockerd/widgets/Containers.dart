@@ -85,7 +85,7 @@ class _ContainersListState extends State<ContainersList> {
                       setState(() {
                         inspectContainer(ctn);
                       });
-                    }, child: Icon(Icons.preview, size:16.0, color:Colors.black87)),
+                    }, child: Icon(Icons.info, size:16.0, color:Colors.black87)),
                   ],
                 )),
               ]
@@ -109,7 +109,7 @@ class _ContainersListState extends State<ContainersList> {
                       Tooltip(
                         waitDuration: Duration(seconds:1),
                         message:'Relancer',
-                        child:TextButton(onPressed: !selected?null:(){runCommandContainer('restart');}, child: Icon(Icons.refresh, size: 15.0, color: selected?Colors.green:Colors.white38,), style:ButtonStyle(backgroundColor: MaterialStateProperty.all<Color>(Color(0xFFeaeaea)))),
+                        child:TextButton(onPressed: !selected?null:(){runCommandContainer('restart');}, child: Icon(Icons.not_started, size: 15.0, color: selected?Colors.green:Colors.white38,), style:ButtonStyle(backgroundColor: MaterialStateProperty.all<Color>(Color(0xFFeaeaea)))),
                       ),
                       SizedBox(width: 5.0,),
                       Tooltip(
@@ -225,7 +225,7 @@ class _ContainersListState extends State<ContainersList> {
           ),
           children: [
             Container(
-              padding:EdgeInsets.all(10.0),
+              padding:EdgeInsets.only(left:10.0, right:10.0),
               width:600,
               height:300,
               child: SingleChildScrollView(
@@ -241,6 +241,9 @@ class _ContainersListState extends State<ContainersList> {
   }
 
   void runCommandContainer(String command){
+    setState(() {
+      _containerLoaded = false;
+    });
     List<String> params = [command];
     session.containers.forEach((element) {
       if(element.selected){

@@ -139,6 +139,10 @@ class _ImagesListState extends State<ImagesList> {
   }
 
   void runCommandImage(String command){
+
+    setState(() {
+      _imageLoaded = false;
+    });
     List<String> params = [command];
     session.images.forEach((element) {
       if(element.selected){
