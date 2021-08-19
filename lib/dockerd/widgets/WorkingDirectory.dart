@@ -33,7 +33,7 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
     _repositoryTEC = new TextEditingController();
     _nameTEC = new TextEditingController();
     _tagTEC = new TextEditingController();
-
+    var envs = {};
     if(session.workingDirectory.isNotEmpty){
       if(session.imageRepository.isNotEmpty || session.imageTag.isNotEmpty){
         _repositoryTEC.text = session.imageRepository;
@@ -41,9 +41,9 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
         _tagTEC.text = session.imageTag;
       }else{
         _extractInfoFromGit(session.workingDirectory);
+        envs = {...session.dockerEnvironmentsVars};
       }
     }
-    var envs = {...session.dockerEnvironmentsVars};
     session.containerEnvs.forEach((key, value) {
       envs[key] = value;
     });
@@ -363,13 +363,25 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
         _tagTEC.text = branch;
         _nameTEC.text = project+'_'+branch;
         var subdomain = branch+'.'+project;
-        _envsTEC.forEach((element) {
-          if(element[0].text.contains('_HOST')){
-            element[1].text = element[1].text.replaceAll('{value}', subdomain);
-          }
-        });
+
 
         setState(() {
+          _envsTEC.clear();
+
+          var envs = {...session.dockerEnvironmentsVars};
+          envs.forEach((key, value) {
+            _envsTEC.add([
+              TextEditingController(text:key),
+              TextEditingController(text:value)
+            ]);
+          });
+
+          _envsTEC.forEach((element) {
+            if(element[0].text.contains('_HOST')){
+              element[1].text = element[1].text.replaceAll('{value}', subdomain);
+            }
+          });
+
           session.workingDirectory = directoryPath;
         });
       });

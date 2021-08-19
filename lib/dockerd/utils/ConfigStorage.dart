@@ -45,7 +45,7 @@ class ConfigStorage
     }else{
       log += (cmd??'')+' '+(parameters!.join(' '));
     }
-    logData += log+'\n';
+    logData = log+'\n'+logData;
   }
 
   String get workingDirectory => session['workingDirectory']??'';
@@ -83,12 +83,12 @@ class ConfigStorage
     storeVal('dockerCommand', val);
   }
 
-  List<String> get dockerDefaultParameters => session['dockerDefaultParameters']??['--tlsverify', '-H=docker-digital.vidal.net:2376'];
+  List<String> get dockerDefaultParameters => session['dockerDefaultParameters']??[];
   set dockerDefaultParameters(List<String> val){
     storeVal('dockerDefaultParameters', val);
   }
 
-  Map<String, String> get dockerEnvironmentsVars => session['dockerEnvironmentsVars']??{'VIRTUAL_HOST':'{value}.ama-doc.vidal.fr'};
+  Map<String, String> get dockerEnvironmentsVars => session['dockerEnvironmentsVars']??{};
   set dockerEnvironmentsVars(Map<String, String> val){
     storeVal('dockerEnvironmentsVars', val);
   }

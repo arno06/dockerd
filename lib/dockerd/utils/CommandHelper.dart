@@ -6,9 +6,8 @@ Future<ProcessResult> runDockerCommand(List<String> parameters){
   List<String> params = new List<String>.from(config.dockerDefaultParameters);
   params.addAll(parameters);
   config.log(cmd: config.dockerCommand, parameters: params);
-  return Process.run(config.dockerCommand, params, runInShell: true).then((ProcessResult results){
+  return Process.run(config.dockerCommand, params).then((ProcessResult results){
     if(results.exitCode != 0){
-      //_log([], command:'Error : '+results.stderr);
       config.log(data: 'Error ('+results.exitCode.toString()+') : '+results.stderr);
     }
     return results;
