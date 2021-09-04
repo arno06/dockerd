@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dockerd/dockerd/utils/CommandHelper.dart';
 import 'package:dockerd/dockerd/utils/ConfigStorage.dart';
 import 'package:dockerd/dockerd/widgets/Console.dart';
+import 'package:dockerd/dockerd/widgets/TabsRow.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,8 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
   late TextEditingController _repositoryTEC;
   late TextEditingController _nameTEC;
   late TextEditingController _tagTEC;
+  late String _dir;
+
   List<List<TextEditingController>> _envsTEC = [];
   ConfigStorage session = ConfigStorage();
   Color killColor = Colors.black26;
@@ -27,32 +30,16 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
   Color buildColor = Colors.black26;
   Color runColor = Colors.black26;
 
+  late List<Map> workingDirs;
+
   @override
   void initState() {
     super.initState();
+    workingDirs = session.workingDirs;
     _repositoryTEC = new TextEditingController();
     _nameTEC = new TextEditingController();
     _tagTEC = new TextEditingController();
-    var envs = {};
-    if(session.workingDirectory.isNotEmpty){
-      if(session.imageRepository.isNotEmpty || session.imageTag.isNotEmpty){
-        _repositoryTEC.text = session.imageRepository;
-        _nameTEC.text = session.containerName;
-        _tagTEC.text = session.imageTag;
-      }else{
-        _extractInfoFromGit(session.workingDirectory);
-        envs = {...session.dockerEnvironmentsVars};
-      }
-    }
-    session.containerEnvs.forEach((key, value) {
-      envs[key] = value;
-    });
-    envs.forEach((key, value) {
-      _envsTEC.add([
-        TextEditingController(text:key),
-        TextEditingController(text:value)
-      ]);
-    });
+    onTabSelected(0);
   }
 
   @override
@@ -65,6 +52,61 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
       element[1].dispose();
     });
     super.dispose();
+  }
+
+  addHandler(){
+
+    workingDirs.add({
+      'image':'',
+      'tag':'',
+      'container':'',
+      'dir':'',
+      'envs':{...session.dockerEnvironmentsVars}
+    });
+    onTabSelected(workingDirs.length-1);
+  }
+
+  onTabDeleted(int index){
+    if(index<=session.workingDirIndex){
+      session.workingDirIndex -= 1;
+    }
+    workingDirs.removeAt(index);
+    if(workingDirs.length == 0){
+      this.addHandler();
+    }else{
+      onTabSelected(session.workingDirIndex);
+    }
+  }
+
+  onTabSelected(int index){
+    _envsTEC.clear();
+    var envs = {};
+    if(workingDirs[index] == null){
+      envs = {...session.dockerEnvironmentsVars};
+      _dir = '';
+    }else{
+
+      Map d = workingDirs[index];
+
+      _dir = d['dir'];
+      _repositoryTEC.text = d['image'];
+      _nameTEC.text = d['container'];
+      _tagTEC.text = d['tag'];
+      d['envs'].forEach((key, value) {
+        envs[key] = value;
+      });
+    }
+
+    envs.forEach((key, value) {
+      _envsTEC.add([
+        TextEditingController(text:key),
+        TextEditingController(text:value)
+      ]);
+    });
+    session.workingDirIndex = index;
+    session.workingDirs = workingDirs;
+
+    setState((){});
   }
 
   @override
@@ -93,8 +135,14 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
       );
     }
 
+    List<String> tabs = [];
+    workingDirs.forEach((element) {
+      tabs.add(element['image']+':'+element['tag']);
+    });
+
     return Column(
       children: [
+        TabsRow(onSelected: onTabSelected, tabs:tabs, onAdd:this.addHandler, onDeleted:this.onTabDeleted, selectedIndex:session.workingDirIndex),
         Opacity(
             opacity: _recycling?1:0,
             child:LinearProgressIndicator()
@@ -158,7 +206,6 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
                             recyclingHandler();
                           },
                           child: Container(
-                            width:150,
                             padding:EdgeInsets.all(10.0),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -194,7 +241,7 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
                                     )
                                 ),
                                 width: double.infinity,
-                                child: Text(session.workingDirectory.isEmpty?'Choisir un dossier':session.workingDirectory),
+                                child: Text(_dir.isEmpty?'Choisir un dossier':_dir),
                               )
                           ),
                           IconButton(onPressed: ()=>_getDirectoryPath(context), icon: Icon(Icons.folder_open, color:Colors.amber)),
@@ -255,10 +302,14 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
       session.log(data:'Valeur incorrecte pour la variable d\'environnement "VIRTUAL_HOST"');
       return;
     }
-    session.containerEnvs = containerEnv;
-    session.imageRepository = _repositoryTEC.text;
-    session.imageTag = _tagTEC.text;
-    session.containerName = _nameTEC.text;
+    workingDirs[session.workingDirIndex] = {
+      'image':_repositoryTEC.text,
+      'tag':_tagTEC.text,
+      'container':_nameTEC.text,
+      'dir':_dir,
+      'envs':containerEnv
+    };
+    session.workingDirs = workingDirs;
     var image = _repositoryTEC.text+':'+_tagTEC.text;
     var container = _nameTEC.text;
     setState(() {
@@ -283,14 +334,14 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
             rmiColor = hasError?Colors.red:Colors.green;
             buildColor = Colors.blueAccent;
           });
-          runDockerCommand(['build', '-t', image, session.workingDirectory]).then((value){
+          runDockerCommand(['build', '-t', image, _dir]).then((value){
             var hasError = value.exitCode != 0;
             setState((){
               buildColor = hasError?Colors.red:Colors.green;
               runColor = Colors.blueAccent;
             });
             var p = ['run', '-d', '--name', container];
-            session.containerEnvs.forEach((key, value) {
+            containerEnv.forEach((key, value) {
               p.add('-e');
               p.add(key+'='+value);
             });
@@ -379,15 +430,32 @@ class _WorkingDirectoryState extends State<WorkingDirectory> {
           _envsTEC.forEach((element) {
             if(element[0].text.contains('_HOST')){
               element[1].text = element[1].text.replaceAll('{value}', subdomain);
+              envs[element[0].text] = element[1].text;
             }
           });
 
-          session.workingDirectory = directoryPath;
+          _dir = directoryPath;
+          workingDirs[session.workingDirIndex] = {
+            'dir':_dir,
+            'image':project,
+            'tag':branch,
+            'container':_nameTEC.text,
+            'envs':envs
+          };
+
+          session.workingDirs = workingDirs;
         });
       });
     }else{
       setState(() {
-        session.workingDirectory = directoryPath;
+        _dir = directoryPath;
+        workingDirs[session.workingDirIndex] = {
+          'dir':_dir,
+          'image':'',
+          'tag':'',
+          'container':'',
+          'envs':{...session.dockerEnvironmentsVars}
+        };
       });
     }
   }

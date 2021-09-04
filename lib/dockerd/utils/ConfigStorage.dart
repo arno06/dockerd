@@ -33,8 +33,8 @@ class ConfigStorage
     if(session['dockerEnvironmentsVars']!= null){
       session['dockerEnvironmentsVars'] = (session['dockerEnvironmentsVars'] as Map).cast<String, String>();
     }
-    if(session['containerEnvs']!= null){
-      session['containerEnvs'] = (session['containerEnvs'] as Map).cast<String, String>();
+    if(session['workingDirs'] != null){
+      session['workingDirs'] = (session['workingDirs'] as List).cast<Map>().toList();
     }
   }
 
@@ -48,31 +48,6 @@ class ConfigStorage
     logData = log+'\n'+logData;
   }
 
-  String get workingDirectory => session['workingDirectory']??'';
-  set workingDirectory(String val){
-    storeVal('workingDirectory', val);
-  }
-
-  String get imageRepository => session['imageRepository']??'';
-  set imageRepository(String val){
-    storeVal('imageRepository', val);
-  }
-
-  String get imageTag => session['imageTag']??'';
-  set imageTag(String val){
-    storeVal('imageTag', val);
-  }
-
-  String get containerName => session['containerName']??'';
-  set containerName(String val){
-    storeVal('containerName', val);
-  }
-
-  Map<String, String> get containerEnvs => session['containerEnvs']??{};
-  set containerEnvs(Map<String, String> val){
-    storeVal('containerEnvs', val);
-  }
-
   bool get sideBarOpened => session['sideBarOpened']??false;
   set sideBarOpened(bool val){
     storeVal('sideBarOpened', val);
@@ -81,6 +56,11 @@ class ConfigStorage
   String get dockerCommand => session['dockerCommand']??'/usr/local/bin/docker';
   set dockerCommand(String val){
     storeVal('dockerCommand', val);
+  }
+
+  int get workingDirIndex => session['workingDirIndex']??0;
+  set workingDirIndex(int val){
+    storeVal('workingDirIndex', val);
   }
 
   List<String> get dockerDefaultParameters => session['dockerDefaultParameters']??[];
@@ -96,6 +76,11 @@ class ConfigStorage
   bool get consoleDisplayed => session['consoleDisplayed']??false;
   set consoleDisplayed(bool val){
     storeVal('consoleDisplayed', val);
+  }
+
+  List<Map> get workingDirs => session['workingDirs']??[];
+  set workingDirs(List<Map> val){
+    storeVal('workingDirs', val);
   }
 
   void storeVal(key, val) async{

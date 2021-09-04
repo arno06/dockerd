@@ -74,7 +74,7 @@ class _SideBarState extends State<SideBar> {
           header,
           SideBarItem.Item(Icons.view_compact, 'Conteneurs', 0, (selectedIndex==0), this.itemSelectedHandler, this.opened),
           SideBarItem.Item(Icons.storage, 'Images', 1, (selectedIndex==1), this.itemSelectedHandler, this.opened),
-          SideBarItem.Item(Icons.folder,'Dossier de travail', 2, (selectedIndex==2), this.itemSelectedHandler, this.opened),
+          SideBarItem.Item(Icons.folder,'Dossiers de travail', 2, (selectedIndex==2), this.itemSelectedHandler, this.opened),
           Spacer(),
           SideBarItem.Item(Icons.settings_sharp,'Paramètres', 3, (selectedIndex==3), this.itemSelectedHandler, this.opened),
         ],
